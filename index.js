@@ -2,35 +2,83 @@ const express = require('express');
 const { createServer } = require('http');
 const { join } = require('path');
 const { Server } = require('socket.io');
+const { MongoClient } = require('mongodb');
 
 const app = express();
 const server = createServer(app);
+
+
+
+
+
+
+
+
+
 const io = new Server(server, {
   connectionStateRecovery: {}
 });
 
-let messages = []; // In-memory store for messages
+
+
+
+async function main() {
+
+  const uri = "mongodb://localhost:27017";
+  const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
 
 app.get('/', (req, res) => {
   res.sendFile(join(__dirname, 'index.html'));
 });
 
+
+var x=1;
+
+
+
+  try {
+    // Connect to the MongoDB server
+    await client.connect();
+
+    // Select the database
+    const db = client.db('chat');
+
+    // Select the collection
+    const collection = db.collection('message');
+
+    // Insert a single document
+ 
+
+
+
+
+
+
+
 io.on('connection', (socket) => {
   console.log('A user connected');
 
+
+  
   // Handle message reception and storage
-  socket.on('chat message', (msg) => {
-    const messageId = messages.length + 1;
-    messages.push({ id: messageId, content: msg });
+  socket.on('chat message',async (msg) => {
+    const messageId = x++;
+    const result = await collection.insertOne({id:messageId,message:msg});
+    console.log(`New document inserted with _id: ${result.messageId}`);
     io.emit('chat message', msg, messageId);
   });
 
-  // Handle reconnection and send missed messages
-  socket.on('reconnect', (lastMessageId) => {
+  socket.on('reconnect', async (lastMessageId) => {
     console.log(`Reconnecting from message ID: ${lastMessageId}`);
-    const missedMessages = messages.filter(msg => msg.id > lastMessageId);
+
+
+    const query = { id: { $gt: lastMessageId } };
+
+   
+    const missedMessages = await collection.find(query).toArray();
+   // const missedMessages = messages.filter(msg => msg.id > lastMessageId);
     missedMessages.forEach(msg => {
-      socket.emit('chat message', msg.content, msg.id);
+      socket.emit('chat message', msg.message, msg.id);
     });
   });
 
@@ -42,3 +90,12 @@ io.on('connection', (socket) => {
 server.listen(3000, () => {
   console.log('Server running at http://localhost:3000');
 });
+
+   
+
+} catch (e) {
+  console.error(e);
+} 
+}
+
+main().catch(console.error);
